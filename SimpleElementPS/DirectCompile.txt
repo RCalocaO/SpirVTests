@@ -1,0 +1,1 @@
+-directcompile -format=SF_VULKAN_SM5 -entry=Main -ps C:/P4S/Samples/Showcases/SunTemple/Saved/ShaderDebugInfo/SF_VULKAN_SM5/Global/SimpleElementPS/SimpleElementPixelShader.usf -nocrashreports
