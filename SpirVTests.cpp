@@ -14,7 +14,8 @@ const char* SPVFile = "C:\\Users\\Rolando Caloca\\Documents\\GitHub\\SpirVTests\
 std::vector<uint32_t> Load(const char* Filename)
 {
 	std::vector<uint32_t> Data;
-	FILE* File = fopen(Filename, "rb");
+	FILE* File;
+	fopen_s(&File, Filename, "rb");
 	if (File)
 	{
 		fseek(File, 0, SEEK_END);
@@ -205,6 +206,288 @@ int main()
 		}
 			break;
 		case SpvOpTypeVoid:
+			break;
+		case SpvOpTypeFunction:
+		{
+			FScope Scope(Ptr, WordCount);
+			*Ptr++;
+			uint32_t Result = *Ptr++;
+			uint32_t ReturnType = *Ptr++;
+			int32_t NumParams = (Scope.SrcPtr + WordCount) - Ptr;
+			for (int32_t Index = 0; Index < NumParams; ++Index)
+			{
+				uint32_t ParamType = *Ptr++;
+			}
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpTypeInt:
+		{
+			*Ptr++;
+			uint32_t Result = *Ptr++;
+			uint32_t Width = *Ptr++;
+			uint32_t Signedness = *Ptr++;
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpTypeFloat:
+		{
+			*Ptr++;
+			uint32_t Result = *Ptr++;
+			uint32_t Width = *Ptr++;
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpTypeBool:
+		{
+			*Ptr++;
+			uint32_t Result = *Ptr++;
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpTypePointer:
+		{
+			*Ptr++;
+			uint32_t Result = *Ptr++;
+			SpvStorageClass StorageClass = (SpvStorageClass)*Ptr++;
+			uint32_t Type = *Ptr++;
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpTypeVector:
+		{
+			*Ptr++;
+			uint32_t Result = *Ptr++;
+			uint32_t ComponentType = *Ptr++;
+			uint32_t ComponentCount = *Ptr++;
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpTypeArray:
+		{
+			*Ptr++;
+			uint32_t Result = *Ptr++;
+			uint32_t ElementType = *Ptr++;
+			uint32_t Length = *Ptr++;
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpConstant:
+		{
+			FScope Scope(Ptr, WordCount);
+			*Ptr++;
+			uint32_t ResultType = *Ptr++;
+			uint32_t Result = *Ptr++;
+			int32_t NumValues = (Scope.SrcPtr + WordCount) - Ptr;
+			for (int32_t Index = 0; Index < NumValues; ++Index)
+			{
+				uint32_t Value = *Ptr++;
+			}
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpTypeStruct:
+		{
+			FScope Scope(Ptr, WordCount);
+			*Ptr++;
+			uint32_t ResultType = *Ptr++;
+			int32_t NumMembers = (Scope.SrcPtr + WordCount) - Ptr;
+			for (int32_t Index = 0; Index < NumMembers; ++Index)
+			{
+				uint32_t MemberType = *Ptr++;
+			}
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpVariable:
+		{
+			FScope Scope(Ptr, WordCount);
+			*Ptr++;
+			uint32_t ResultType = *Ptr++;
+			uint32_t Result = *Ptr++;
+			SpvStorageClass StorageClass = (SpvStorageClass)*Ptr++;
+			int32_t HasInitializer = (Scope.SrcPtr + WordCount) - Ptr;
+			Verify(HasInitializer == 0 || HasInitializer == 1);
+			if (HasInitializer == 1)
+			{
+				uint32_t Initializer = *Ptr++;
+			}
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpTypeImage:
+		{
+			FScope Scope(Ptr, WordCount);
+			*Ptr++;
+			uint32_t ResultType = *Ptr++;
+			uint32_t SampledType = *Ptr++;
+			SpvDim Dim = (SpvDim)*Ptr++;
+			uint32_t Depth = *Ptr++;
+			uint32_t Arrayed = *Ptr++;
+			uint32_t MS = *Ptr++;
+			uint32_t Sampled = *Ptr++;
+			SpvImageFormat ImageFormat = (SpvImageFormat)*Ptr++;
+
+			int32_t HasQualifier = (Scope.SrcPtr + WordCount) - Ptr;
+			Verify(HasQualifier == 0 || HasQualifier == 1);
+			if (HasQualifier == 1)
+			{
+				SpvAccessQualifier Qualifier = (SpvAccessQualifier)*Ptr++;
+			}
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpConstantComposite:
+		{
+			FScope Scope(Ptr, WordCount);
+			*Ptr++;
+			uint32_t ResultType = *Ptr++;
+			uint32_t Result = *Ptr++;
+			int32_t NumElements = (Scope.SrcPtr + WordCount) - Ptr;
+			for (int32_t Index = 0; Index < NumElements; ++Index)
+			{
+				uint32_t Element = *Ptr++;
+			}
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpTypeSampledImage:
+		{
+			*Ptr++;
+			uint32_t Result = *Ptr++;
+			uint32_t ImageType = *Ptr++;
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpFunction:
+		{
+			*Ptr++;
+			uint32_t ResultType = *Ptr++;
+			uint32_t Result = *Ptr++;
+			uint32_t FunctionControl = /*SpvFunctionControlMask*/*Ptr++;
+			uint32_t FunctionType = *Ptr++;
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpLabel:
+		{
+			*Ptr++;
+			uint32_t Result = *Ptr++;
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpAccessChain:
+		{
+			FScope Scope(Ptr, WordCount);
+			*Ptr++;
+			uint32_t ResultType = *Ptr++;
+			uint32_t Result = *Ptr++;
+			uint32_t Base = *Ptr++;
+			int32_t NumIndices = (Scope.SrcPtr + WordCount) - Ptr;
+			for (int32_t Index = 0; Index < NumIndices; ++Index)
+			{
+				uint32_t ChainIndex = *Ptr++;
+			}
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpLoad:
+		{
+			FScope Scope(Ptr, WordCount);
+			*Ptr++;
+			uint32_t ResultType = *Ptr++;
+			uint32_t Result = *Ptr++;
+			uint32_t Pointer = *Ptr++;
+			int32_t HasMemoryAccess = (Scope.SrcPtr + WordCount) - Ptr;
+			Verify(HasMemoryAccess == 0 || HasMemoryAccess == 1);
+			if (HasMemoryAccess == 1)
+			{
+				uint32_t MemoryAccess = /*SpvMemoryAccessMask*/*Ptr++;
+			}
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpStore:
+		{
+			FScope Scope(Ptr, WordCount);
+			*Ptr++;
+			uint32_t Pointer = *Ptr++;
+			uint32_t Object = *Ptr++;
+			int32_t HasMemoryAccess = (Scope.SrcPtr + WordCount) - Ptr;
+			Verify(HasMemoryAccess == 0 || HasMemoryAccess == 1);
+			if (HasMemoryAccess == 1)
+			{
+				uint32_t MemoryAccess = /*SpvMemoryAccessMask*/*Ptr++;
+			}
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpINotEqual:
+		{
+			*Ptr++;
+			uint32_t ResultType = *Ptr++;
+			uint32_t Result = *Ptr++;
+			uint32_t Op1 = *Ptr++;
+			uint32_t Op2 = *Ptr++;
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpSelectionMerge:
+		{
+			*Ptr++;
+			uint32_t MergeBlock = *Ptr++;
+			uint32_t SelectionControl = /*SpvSelectionControlMask*/*Ptr++;
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpConvertFToS:
+		{
+			*Ptr++;
+			uint32_t ResultType = *Ptr++;
+			uint32_t Result = *Ptr++;
+			uint32_t FloatValue = *Ptr++;
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpImage:
+		{
+			*Ptr++;
+			uint32_t ResultType = *Ptr++;
+			uint32_t Result = *Ptr++;
+			uint32_t SampledImage = *Ptr++;
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpBranchConditional:
+		{
+			FScope Scope(Ptr, WordCount);
+			*Ptr++;
+			uint32_t Condition = *Ptr++;
+			uint32_t TrueLabel = *Ptr++;
+			uint32_t FalseLabel = *Ptr++;
+			int32_t NumBranchWeights = (Scope.SrcPtr + WordCount) - Ptr;
+			for (int32_t Index = 0; Index < NumBranchWeights; ++Index)
+			{
+				uint32_t BranchWeight = *Ptr++;
+			}
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpVectorShuffle:
+		{
+			FScope Scope(Ptr, WordCount);
+			*Ptr++;
+			uint32_t ResultType = *Ptr++;
+			uint32_t Result = *Ptr++;
+			uint32_t Vector1 = *Ptr++;
+			uint32_t Vector2 = *Ptr++;
+			int32_t NumComponents = (Scope.SrcPtr + WordCount) - Ptr;
+			for (int32_t Index = 0; Index < NumComponents; ++Index)
+			{
+				uint32_t Component = *Ptr++;
+			}
+			bAutoIncrease = false;
+		}
 			break;
 		default:
 			Verify(false);
