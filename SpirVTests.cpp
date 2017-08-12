@@ -141,9 +141,10 @@ struct FSpirVParser
 			return false;
 		}
 
-		uint32_t Bound = ReadHeader(Ptr);
 		Ptr = &Data[0];
 		End = Ptr + Data.size();
+
+		uint32_t Bound = ReadHeader(Ptr);
 
 		return true;
 	}
