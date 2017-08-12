@@ -9,7 +9,7 @@
 #include <string>
 
 
-const char* SPVFile = "C:\\Users\\Rolando Caloca\\Documents\\GitHub\\SpirVTests\\SimpleElementPS\\Output.spv";
+const char* SPVFile = ".\\SimpleElementPS\\Output.spv";
 
 std::vector<uint32_t> Load(const char* Filename)
 {
@@ -20,7 +20,7 @@ std::vector<uint32_t> Load(const char* Filename)
 	{
 		fseek(File, 0, SEEK_END);
 		auto Size = ftell(File);
-		Data.resize(Size);
+		Data.resize((Size + 3) / 4);
 		fseek(File, 0, SEEK_SET);
 		fread(&Data[0], 1, Size, File);
 		fclose(File);
@@ -123,20 +123,25 @@ void ReadDecoration(uint32_t*& Ptr, SpvDecoration Decoration)
 		break;
 	}
 }
-
+#include <windows.h>
 int main()
 {
+	char Dir[256];
+	GetCurrentDirectoryA(256, Dir);
 	auto Data = Load(SPVFile);
 	uint32_t* Ptr = &Data[0];
 	uint32_t* End = Ptr + Data.size();
 	uint32_t Bound = ReadHeader(Ptr);
-
+	uint32_t* PrevPtr = nullptr;
+	SpvOp OpCode = (SpvOp)-1;
 	while (Ptr < End)
 	{
 		bool bAutoIncrease = true;
 		Verify(*Ptr);
+		PrevPtr = Ptr;
+		uint32_t* SrcPtr = Ptr;
 		uint32_t WordCount = (*Ptr >> 16) & 65535;
-		SpvOp OpCode = (SpvOp)(*Ptr & 65535);
+		OpCode = (SpvOp)(*Ptr & 65535);
 
 		switch (OpCode)
 		{
@@ -152,7 +157,7 @@ int main()
 			ProcessExecModel(ExecModel);
 			uint32_t EntryPoint = *Ptr++;
 			auto EntryName = ReadLiteralString(Ptr);
-			int32_t NumInterfaces = (Scope.SrcPtr + WordCount) - Ptr;
+			int32_t NumInterfaces = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 			Verify(NumInterfaces >= 0);
 			for (int32_t Index = 0; Index < NumInterfaces; ++Index)
 			{
@@ -213,7 +218,7 @@ int main()
 			*Ptr++;
 			uint32_t Result = *Ptr++;
 			uint32_t ReturnType = *Ptr++;
-			int32_t NumParams = (Scope.SrcPtr + WordCount) - Ptr;
+			int32_t NumParams = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 			for (int32_t Index = 0; Index < NumParams; ++Index)
 			{
 				uint32_t ParamType = *Ptr++;
@@ -278,7 +283,7 @@ int main()
 			*Ptr++;
 			uint32_t ResultType = *Ptr++;
 			uint32_t Result = *Ptr++;
-			int32_t NumValues = (Scope.SrcPtr + WordCount) - Ptr;
+			int32_t NumValues = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 			for (int32_t Index = 0; Index < NumValues; ++Index)
 			{
 				uint32_t Value = *Ptr++;
@@ -291,7 +296,7 @@ int main()
 			FScope Scope(Ptr, WordCount);
 			*Ptr++;
 			uint32_t ResultType = *Ptr++;
-			int32_t NumMembers = (Scope.SrcPtr + WordCount) - Ptr;
+			int32_t NumMembers = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 			for (int32_t Index = 0; Index < NumMembers; ++Index)
 			{
 				uint32_t MemberType = *Ptr++;
@@ -306,7 +311,7 @@ int main()
 			uint32_t ResultType = *Ptr++;
 			uint32_t Result = *Ptr++;
 			SpvStorageClass StorageClass = (SpvStorageClass)*Ptr++;
-			int32_t HasInitializer = (Scope.SrcPtr + WordCount) - Ptr;
+			int32_t HasInitializer = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 			Verify(HasInitializer == 0 || HasInitializer == 1);
 			if (HasInitializer == 1)
 			{
@@ -328,7 +333,7 @@ int main()
 			uint32_t Sampled = *Ptr++;
 			SpvImageFormat ImageFormat = (SpvImageFormat)*Ptr++;
 
-			int32_t HasQualifier = (Scope.SrcPtr + WordCount) - Ptr;
+			int32_t HasQualifier = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 			Verify(HasQualifier == 0 || HasQualifier == 1);
 			if (HasQualifier == 1)
 			{
@@ -343,7 +348,21 @@ int main()
 			*Ptr++;
 			uint32_t ResultType = *Ptr++;
 			uint32_t Result = *Ptr++;
-			int32_t NumElements = (Scope.SrcPtr + WordCount) - Ptr;
+			int32_t NumElements = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
+			for (int32_t Index = 0; Index < NumElements; ++Index)
+			{
+				uint32_t Element = *Ptr++;
+			}
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpCompositeConstruct:
+		{
+			FScope Scope(Ptr, WordCount);
+			*Ptr++;
+			uint32_t ResultType = *Ptr++;
+			uint32_t Result = *Ptr++;
+			int32_t NumElements = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 			for (int32_t Index = 0; Index < NumElements; ++Index)
 			{
 				uint32_t Element = *Ptr++;
@@ -369,7 +388,26 @@ int main()
 			bAutoIncrease = false;
 		}
 			break;
+		case SpvOpFunctionEnd:
+			break;
+		case SpvOpReturn:
+		case SpvOpKill:
+			break;
+		case SpvOpReturnValue:
+		{
+			*Ptr++;
+			uint32_t Result = *Ptr++;
+			bAutoIncrease = false;
+		}
+			break;
 		case SpvOpLabel:
+		{
+			*Ptr++;
+			uint32_t Result = *Ptr++;
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpBranch:
 		{
 			*Ptr++;
 			uint32_t Result = *Ptr++;
@@ -383,7 +421,7 @@ int main()
 			uint32_t ResultType = *Ptr++;
 			uint32_t Result = *Ptr++;
 			uint32_t Base = *Ptr++;
-			int32_t NumIndices = (Scope.SrcPtr + WordCount) - Ptr;
+			int32_t NumIndices = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 			for (int32_t Index = 0; Index < NumIndices; ++Index)
 			{
 				uint32_t ChainIndex = *Ptr++;
@@ -398,7 +436,7 @@ int main()
 			uint32_t ResultType = *Ptr++;
 			uint32_t Result = *Ptr++;
 			uint32_t Pointer = *Ptr++;
-			int32_t HasMemoryAccess = (Scope.SrcPtr + WordCount) - Ptr;
+			int32_t HasMemoryAccess = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 			Verify(HasMemoryAccess == 0 || HasMemoryAccess == 1);
 			if (HasMemoryAccess == 1)
 			{
@@ -413,13 +451,24 @@ int main()
 			*Ptr++;
 			uint32_t Pointer = *Ptr++;
 			uint32_t Object = *Ptr++;
-			int32_t HasMemoryAccess = (Scope.SrcPtr + WordCount) - Ptr;
+			int32_t HasMemoryAccess = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 			Verify(HasMemoryAccess == 0 || HasMemoryAccess == 1);
 			if (HasMemoryAccess == 1)
 			{
 				uint32_t MemoryAccess = /*SpvMemoryAccessMask*/*Ptr++;
 			}
 			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpTypeRuntimeArray:
+		{
+			Verify(0);
+/*
+			*Ptr++;
+			uint32_t Result = *Ptr++;
+			uint32_t ElementType = *Ptr++;
+			bAutoIncrease = false;
+*/
 		}
 			break;
 		case SpvOpINotEqual:
@@ -449,12 +498,78 @@ int main()
 			bAutoIncrease = false;
 		}
 			break;
+		case SpvOpFOrdEqual:
+		case SpvOpFOrdNotEqual:
+		case SpvOpFOrdLessThanEqual:
+		case SpvOpFOrdLessThan:
+		case SpvOpFOrdGreaterThan:
+		case SpvOpFOrdGreaterThanEqual:
+		{
+			*Ptr++;
+			uint32_t ResultType = *Ptr++;
+			uint32_t Result = *Ptr++;
+			uint32_t Operand1 = *Ptr++;
+			uint32_t Operand2 = *Ptr++;
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpFNegate:
+		{
+			*Ptr++;
+			uint32_t ResultType = *Ptr++;
+			uint32_t Result = *Ptr++;
+			uint32_t Operand = *Ptr++;
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpAny:
+		case SpvOpAll:
+		{
+			*Ptr++;
+			uint32_t ResultType = *Ptr++;
+			uint32_t Result = *Ptr++;
+			uint32_t Vector = *Ptr++;
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpFAdd:
+		case SpvOpFDiv:
+		case SpvOpFSub:
+		case SpvOpFMul:
+		case SpvOpFMod:
+		case SpvOpDot:
+		case SpvOpOuterProduct:
+		{
+			*Ptr++;
+			uint32_t ResultType = *Ptr++;
+			uint32_t Result = *Ptr++;
+			uint32_t Operand1 = *Ptr++;
+			uint32_t Operand2 = *Ptr++;
+			bAutoIncrease = false;
+		}
+			break;
 		case SpvOpImage:
 		{
 			*Ptr++;
 			uint32_t ResultType = *Ptr++;
 			uint32_t Result = *Ptr++;
 			uint32_t SampledImage = *Ptr++;
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpImageSampleImplicitLod:
+		{
+			FScope Scope(Ptr, WordCount);
+			*Ptr++;
+			uint32_t ResultType = *Ptr++;
+			uint32_t Result = *Ptr++;
+			uint32_t SampledImage = *Ptr++;
+			uint32_t Coordinate = *Ptr++;
+			int32_t NumOperands = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
+			for (int32_t Index = 0; Index < NumOperands; ++Index)
+			{
+				uint32_t Operand = /*SpvImageOperandsMask*/*Ptr++;
+			}
 			bAutoIncrease = false;
 		}
 			break;
@@ -465,7 +580,7 @@ int main()
 			uint32_t Condition = *Ptr++;
 			uint32_t TrueLabel = *Ptr++;
 			uint32_t FalseLabel = *Ptr++;
-			int32_t NumBranchWeights = (Scope.SrcPtr + WordCount) - Ptr;
+			int32_t NumBranchWeights = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 			for (int32_t Index = 0; Index < NumBranchWeights; ++Index)
 			{
 				uint32_t BranchWeight = *Ptr++;
@@ -481,10 +596,41 @@ int main()
 			uint32_t Result = *Ptr++;
 			uint32_t Vector1 = *Ptr++;
 			uint32_t Vector2 = *Ptr++;
-			int32_t NumComponents = (Scope.SrcPtr + WordCount) - Ptr;
+			int32_t NumComponents = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 			for (int32_t Index = 0; Index < NumComponents; ++Index)
 			{
 				uint32_t Component = *Ptr++;
+			}
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpImageFetch:
+		{
+			FScope Scope(Ptr, WordCount);
+			*Ptr++;
+			uint32_t ResultType = *Ptr++;
+			uint32_t Result = *Ptr++;
+			uint32_t Image = *Ptr++;
+			uint32_t Coordinate = *Ptr++;
+			int32_t NumComponents = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
+			for (int32_t Index = 0; Index < NumComponents; ++Index)
+			{
+				uint32_t ImageOperands = /*SpvImageOperandsMask*/*Ptr++;
+			}
+			bAutoIncrease = false;
+		}
+			break;
+		case SpvOpCompositeExtract:
+		{
+			FScope Scope(Ptr, WordCount);
+			*Ptr++;
+			uint32_t ResultType = *Ptr++;
+			uint32_t Result = *Ptr++;
+			uint32_t Composite = *Ptr++;
+			int32_t NumComponents = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
+			for (int32_t Index = 0; Index < NumComponents; ++Index)
+			{
+				int32_t Literal = *Ptr++;
 			}
 			bAutoIncrease = false;
 		}
@@ -497,6 +643,8 @@ int main()
 		{
 			Ptr += WordCount;
 		}
+
+		Verify(SrcPtr + WordCount == Ptr);
 	}
 
 	Verify(Ptr == End);
