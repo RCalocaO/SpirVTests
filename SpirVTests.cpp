@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string>
+#include <map>
 
 
 const char* SPVFile = ".\\SimpleElementPS\\Output.spv";
@@ -81,49 +82,52 @@ struct FScope
 	}
 };
 
-void ReadDecoration(uint32_t*& Ptr, SpvDecoration Decoration)
+std::vector<uint32_t> ReadDecoration(uint32_t*& Ptr, SpvDecoration Decoration)
 {
+	std::vector<uint32_t> Decorations;
 	switch (Decoration)
 	{
-	case SpvDecorationArrayStride:
-	{
-		uint32_t ArrayStride = *Ptr++;
-	}
-		break;
-	case SpvDecorationOffset:
-	{
-		uint32_t ByteOffset = *Ptr++;
-	}
-	break;
 	case SpvDecorationBlock:
 	case SpvDecorationBufferBlock:
 	case SpvDecorationRowMajor:
 		break;
+	case SpvDecorationArrayStride:
+	case SpvDecorationOffset:
 	case SpvDecorationDescriptorSet:
-	{
-		uint32_t DescriptorSet = *Ptr++;
-	}
-	break;
 	case SpvDecorationBinding:
-	{
-		uint32_t Binding = *Ptr++;
-	}
-	break;
 	case SpvDecorationBuiltIn:
-	{
-		SpvBuiltIn Builtin = (SpvBuiltIn)*Ptr++;
-	}
-	break;
 	case SpvDecorationLocation:
 	{
-		uint32_t Location = *Ptr++;
+		uint32_t ArrayStride = *Ptr++;
+		Decorations.push_back(ArrayStride);
 	}
 	break;
 	default:
 		Verify(false);
 		break;
 	}
+	return Decorations;
 }
+
+struct FEntryPoint
+{
+	std::string Name;
+	uint32_t Id;
+	std::vector<uint32_t> Interfaces;
+};
+
+struct FType
+{
+	enum class EType
+	{
+		Unknown = -1,
+		Void,
+		Int,
+		Float,
+		Function,
+	};
+	EType Type = EType::Unknown;
+};
 
 struct FSpirVParser
 {
@@ -132,6 +136,34 @@ struct FSpirVParser
 	uint32_t* End = nullptr;
 	uint32_t* PrevPtr = nullptr;
 	SpvOp PrevOpCode = (SpvOp)-1;
+
+	std::vector<FEntryPoint> EntryPoints;
+
+	std::map<uint32_t, std::string> Names;
+
+	struct FMemberName
+	{
+		uint32_t MemberIndex;
+		std::string Name;
+	};
+	// Key is StructType
+	std::map<uint32_t, std::vector<FMemberName>> MemberNames;
+
+	struct FDecoration
+	{
+		SpvDecoration Decoration;
+		std::vector<uint32_t> Literals;
+	};
+	std::map<uint32_t, std::vector<FDecoration>> Decorations;
+
+	struct FMemberDecoration : public FDecoration
+	{
+		uint32_t MemberIndex;
+	};
+	// Key is StructType
+	std::map<uint32_t, std::vector<FDecoration>> MemberDecorations;
+
+	std::map<uint32_t, FType> Types;
 
 	bool Init(const char* File)
 	{
@@ -171,14 +203,16 @@ struct FSpirVParser
 				Ptr++;
 				SpvExecutionModel ExecModel = (SpvExecutionModel)*Ptr++;
 				ProcessExecModel(ExecModel);
-				uint32_t EntryPoint = *Ptr++;
-				auto EntryName = ReadLiteralString(Ptr);
+				FEntryPoint EntryPoint;
+				EntryPoint.Id = *Ptr++;
+				EntryPoint.Name = ReadLiteralString(Ptr);
 				int32_t NumInterfaces = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 				Verify(NumInterfaces >= 0);
 				for (int32_t Index = 0; Index < NumInterfaces; ++Index)
 				{
-					uint32_t Interface = *Ptr++;
+					EntryPoint.Interfaces.push_back(*Ptr++);
 				}
+				EntryPoints.push_back(EntryPoint);
 				bAutoIncrease = false;
 			}
 			break;
@@ -192,6 +226,7 @@ struct FSpirVParser
 				Ptr++;
 				uint32_t Target = *Ptr++;
 				auto Name = ReadLiteralString(Ptr);
+				Names[Target] = Name;
 				bAutoIncrease = false;
 			}
 			break;
@@ -199,9 +234,11 @@ struct FSpirVParser
 			{
 				FScope Scope(Ptr, WordCount);
 				Ptr++;
-				uint32_t Type = *Ptr++;
-				auto Member = *Ptr++;
-				auto Name = ReadLiteralString(Ptr);
+				uint32_t StructType = *Ptr++;
+				FMemberName MemberName;
+				MemberName.MemberIndex = *Ptr++;
+				MemberName.Name = ReadLiteralString(Ptr);
+				MemberNames[StructType].push_back(MemberName);
 				bAutoIncrease = false;
 			}
 			break;
@@ -210,8 +247,11 @@ struct FSpirVParser
 				FScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t Target = *Ptr++;
-				SpvDecoration Decoration = (SpvDecoration)*Ptr++;
-				ReadDecoration(Ptr, Decoration);
+				FDecoration Decoration;
+				Decoration.Decoration = (SpvDecoration)*Ptr++;
+				Decoration.Literals = ReadDecoration(Ptr, Decoration.Decoration);				
+
+				Decorations[Target].push_back(Decoration);
 				bAutoIncrease = false;
 			}
 			break;
@@ -220,16 +260,27 @@ struct FSpirVParser
 				FScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t StructureType = *Ptr++;
-				uint32_t Member = *Ptr++;
-				SpvDecoration Decoration = (SpvDecoration)*Ptr++;
-				ReadDecoration(Ptr, Decoration);
+				FMemberDecoration Decoration;
+				Decoration.MemberIndex = *Ptr++;
+				Decoration.Decoration = (SpvDecoration)*Ptr++;
+				Decoration.Literals = ReadDecoration(Ptr, Decoration.Decoration);
+				MemberDecorations[StructureType].push_back(Decoration);
 				bAutoIncrease = false;
 			}
 			break;
 			case SpvOpTypeVoid:
+			{
+				FType VoidType;
+				VoidType.Type = FType::EType::Void;
+				++Ptr;
+				uint32_t Result = *Ptr++;
+				Types[Result] = VoidType;
+				bAutoIncrease = false;
+			}
 				break;
 			case SpvOpTypeFunction:
 			{
+				Verify(false);
 				FScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t Result = *Ptr++;
@@ -244,6 +295,7 @@ struct FSpirVParser
 			break;
 			case SpvOpTypeInt:
 			{
+				Verify(false);
 				*Ptr++;
 				uint32_t Result = *Ptr++;
 				uint32_t Width = *Ptr++;
@@ -253,6 +305,7 @@ struct FSpirVParser
 			break;
 			case SpvOpTypeFloat:
 			{
+				Verify(false);
 				*Ptr++;
 				uint32_t Result = *Ptr++;
 				uint32_t Width = *Ptr++;
@@ -261,6 +314,7 @@ struct FSpirVParser
 			break;
 			case SpvOpTypeBool:
 			{
+				Verify(false);
 				*Ptr++;
 				uint32_t Result = *Ptr++;
 				bAutoIncrease = false;
@@ -268,6 +322,7 @@ struct FSpirVParser
 			break;
 			case SpvOpTypePointer:
 			{
+				Verify(false);
 				*Ptr++;
 				uint32_t Result = *Ptr++;
 				SpvStorageClass StorageClass = (SpvStorageClass)*Ptr++;
@@ -277,6 +332,7 @@ struct FSpirVParser
 			break;
 			case SpvOpTypeVector:
 			{
+				Verify(false);
 				*Ptr++;
 				uint32_t Result = *Ptr++;
 				uint32_t ComponentType = *Ptr++;
@@ -286,6 +342,7 @@ struct FSpirVParser
 			break;
 			case SpvOpTypeArray:
 			{
+				Verify(false);
 				*Ptr++;
 				uint32_t Result = *Ptr++;
 				uint32_t ElementType = *Ptr++;
@@ -309,6 +366,7 @@ struct FSpirVParser
 			break;
 			case SpvOpTypeStruct:
 			{
+				Verify(false);
 				FScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
@@ -338,6 +396,7 @@ struct FSpirVParser
 			break;
 			case SpvOpTypeImage:
 			{
+				Verify(false);
 				FScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
@@ -388,6 +447,7 @@ struct FSpirVParser
 			break;
 			case SpvOpTypeSampledImage:
 			{
+				Verify(false);
 				*Ptr++;
 				uint32_t Result = *Ptr++;
 				uint32_t ImageType = *Ptr++;
