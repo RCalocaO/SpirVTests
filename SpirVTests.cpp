@@ -122,11 +122,61 @@ struct FType
 	{
 		Unknown = -1,
 		Void,
+		Bool,
 		Int,
 		Float,
+		Vector,
+		Array,
+		Struct,
+		Pointer,
+		Image,
 		Function,
 	};
 	EType Type = EType::Unknown;
+
+	struct
+	{
+		uint32_t ReturnType = 0;
+		std::vector<uint32_t> ParameterTypes;
+	} Function;
+
+	uint32_t Width = 0;
+	uint32_t Signedness = 0;
+
+	struct
+	{
+		uint32_t NumComponents = 0;
+		uint32_t ComponentType = 0;
+	} Vector;
+
+	struct
+	{
+		uint32_t Length = 0;
+		uint32_t ElementType = 0;
+	} Array;
+
+	struct
+	{
+		std::vector<uint32_t> MemberTypes;
+	} Struct;
+
+	struct
+	{
+		SpvStorageClass StorageClass;
+		uint32_t Type;
+	} Pointer;
+
+	struct
+	{
+		uint32_t SampledType = 0;
+		SpvDim Dim = SpvDimMax;
+		uint32_t Depth = 0;
+		uint32_t Arrayed = 0;
+		uint32_t MS = 0;
+		uint32_t Sampled = 0;
+		SpvImageFormat ImageFormat = SpvImageFormatUnknown;
+		SpvAccessQualifier Qualifier = SpvAccessQualifierMax;
+	} Image;
 };
 
 struct FSpirVParser
@@ -229,7 +279,7 @@ struct FSpirVParser
 				Names[Target] = Name;
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpMemberName:
 			{
 				FScope Scope(Ptr, WordCount);
@@ -241,7 +291,7 @@ struct FSpirVParser
 				MemberNames[StructType].push_back(MemberName);
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpDecorate:
 			{
 				FScope Scope(Ptr, WordCount);
@@ -254,7 +304,7 @@ struct FSpirVParser
 				Decorations[Target].push_back(Decoration);
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpMemberDecorate:
 			{
 				FScope Scope(Ptr, WordCount);
@@ -267,91 +317,107 @@ struct FSpirVParser
 				MemberDecorations[StructureType].push_back(Decoration);
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpTypeVoid:
 			{
-				FType VoidType;
-				VoidType.Type = FType::EType::Void;
+				FType Type;
+				Type.Type = FType::EType::Void;
 				++Ptr;
 				uint32_t Result = *Ptr++;
-				Types[Result] = VoidType;
+				Types[Result] = Type;
 				bAutoIncrease = false;
 			}
 				break;
 			case SpvOpTypeFunction:
 			{
-				Verify(false);
+				FType Type;
+				Type.Type = FType::EType::Function;
 				FScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t Result = *Ptr++;
-				uint32_t ReturnType = *Ptr++;
+				Type.Function.ReturnType = *Ptr++;
 				int32_t NumParams = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 				for (int32_t Index = 0; Index < NumParams; ++Index)
 				{
 					uint32_t ParamType = *Ptr++;
+					Type.Function.ParameterTypes.push_back(ParamType);
 				}
+				Types[Result] = Type;
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpTypeInt:
 			{
-				Verify(false);
+				FType Type;
+				Type.Type = FType::EType::Int;
 				*Ptr++;
 				uint32_t Result = *Ptr++;
-				uint32_t Width = *Ptr++;
-				uint32_t Signedness = *Ptr++;
+				Type.Width = *Ptr++;
+				Type.Signedness = *Ptr++;
+				Types[Result] = Type;
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpTypeFloat:
 			{
-				Verify(false);
+				FType Type;
+				Type.Type = FType::EType::Int;
 				*Ptr++;
 				uint32_t Result = *Ptr++;
-				uint32_t Width = *Ptr++;
+				Type.Width = *Ptr++;
+				Types[Result] = Type;
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpTypeBool:
 			{
-				Verify(false);
+				FType Type;
+				Type.Type = FType::EType::Bool;
 				*Ptr++;
 				uint32_t Result = *Ptr++;
+				Types[Result] = Type;
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpTypePointer:
 			{
-				Verify(false);
+				FType Type;
+				Type.Type = FType::EType::Pointer;
 				*Ptr++;
 				uint32_t Result = *Ptr++;
-				SpvStorageClass StorageClass = (SpvStorageClass)*Ptr++;
-				uint32_t Type = *Ptr++;
+				Type.Pointer.StorageClass = (SpvStorageClass)*Ptr++;
+				Type.Pointer.Type = *Ptr++;
+				Types[Result] = Type;
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpTypeVector:
 			{
-				Verify(false);
+				FType Type;
+				Type.Type = FType::EType::Vector;
 				*Ptr++;
 				uint32_t Result = *Ptr++;
-				uint32_t ComponentType = *Ptr++;
-				uint32_t ComponentCount = *Ptr++;
+				Type.Vector.ComponentType = *Ptr++;
+				Type.Vector.NumComponents = *Ptr++;
+				Types[Result] = Type;
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpTypeArray:
 			{
-				Verify(false);
+				FType Type;
+				Type.Type = FType::EType::Array;
 				*Ptr++;
 				uint32_t Result = *Ptr++;
-				uint32_t ElementType = *Ptr++;
-				uint32_t Length = *Ptr++;
+				Type.Array.ElementType = *Ptr++;
+				Type.Array.Length = *Ptr++;
+				Types[Result] = Type;
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpConstant:
 			{
+				Verify(false);
 				FScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
@@ -363,10 +429,11 @@ struct FSpirVParser
 				}
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpTypeStruct:
 			{
-				Verify(false);
+				FType Type;
+				Type.Type = FType::EType::Struct;
 				FScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
@@ -374,12 +441,15 @@ struct FSpirVParser
 				for (int32_t Index = 0; Index < NumMembers; ++Index)
 				{
 					uint32_t MemberType = *Ptr++;
+					Type.Struct.MemberTypes.push_back(MemberType);
 				}
+				Types[ResultType] = Type;
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpVariable:
 			{
+				Verify(false);
 				FScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
@@ -393,32 +463,35 @@ struct FSpirVParser
 				}
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpTypeImage:
 			{
-				Verify(false);
+				FType Type;
+				Type.Type = FType::EType::Image;
 				FScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
-				uint32_t SampledType = *Ptr++;
-				SpvDim Dim = (SpvDim)*Ptr++;
-				uint32_t Depth = *Ptr++;
-				uint32_t Arrayed = *Ptr++;
-				uint32_t MS = *Ptr++;
-				uint32_t Sampled = *Ptr++;
-				SpvImageFormat ImageFormat = (SpvImageFormat)*Ptr++;
+				Type.Image.SampledType = *Ptr++;
+				Type.Image.Dim = (SpvDim)*Ptr++;
+				Type.Image.Depth = *Ptr++;
+				Type.Image.Arrayed = *Ptr++;
+				Type.Image.MS = *Ptr++;
+				Type.Image.Sampled = *Ptr++;
+				Type.Image.ImageFormat = (SpvImageFormat)*Ptr++;
 
 				int32_t HasQualifier = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 				Verify(HasQualifier == 0 || HasQualifier == 1);
 				if (HasQualifier == 1)
 				{
-					SpvAccessQualifier Qualifier = (SpvAccessQualifier)*Ptr++;
+					Type.Image.Qualifier = (SpvAccessQualifier)*Ptr++;
 				}
+				Types[ResultType] = Type;
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpConstantComposite:
 			{
+				Verify(false);
 				FScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
@@ -433,6 +506,7 @@ struct FSpirVParser
 			break;
 			case SpvOpCompositeConstruct:
 			{
+				Verify(false);
 				FScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
@@ -444,7 +518,7 @@ struct FSpirVParser
 				}
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpTypeSampledImage:
 			{
 				Verify(false);
@@ -453,9 +527,10 @@ struct FSpirVParser
 				uint32_t ImageType = *Ptr++;
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpFunction:
 			{
+				Verify(false);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
 				uint32_t Result = *Ptr++;
@@ -463,7 +538,7 @@ struct FSpirVParser
 				uint32_t FunctionType = *Ptr++;
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpFunctionEnd:
 				break;
 			case SpvOpReturn:
@@ -471,27 +546,31 @@ struct FSpirVParser
 				break;
 			case SpvOpReturnValue:
 			{
+				Verify(false);
 				*Ptr++;
 				uint32_t Result = *Ptr++;
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpLabel:
 			{
+				Verify(false);
 				*Ptr++;
 				uint32_t Result = *Ptr++;
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpBranch:
 			{
+				Verify(false);
 				*Ptr++;
 				uint32_t Result = *Ptr++;
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpAccessChain:
 			{
+				Verify(false);
 				FScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
@@ -504,9 +583,10 @@ struct FSpirVParser
 				}
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpLoad:
 			{
+				Verify(false);
 				FScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
@@ -520,9 +600,10 @@ struct FSpirVParser
 				}
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpStore:
 			{
+				Verify(false);
 				FScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t Pointer = *Ptr++;
@@ -535,7 +616,7 @@ struct FSpirVParser
 				}
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpTypeRuntimeArray:
 			{
 				Verify(0);
@@ -546,9 +627,10 @@ struct FSpirVParser
 				bAutoIncrease = false;
 				*/
 			}
-			break;
+				break;
 			case SpvOpINotEqual:
 			{
+				Verify(false);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
 				uint32_t Result = *Ptr++;
@@ -556,24 +638,26 @@ struct FSpirVParser
 				uint32_t Op2 = *Ptr++;
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpSelectionMerge:
 			{
+				Verify(false);
 				*Ptr++;
 				uint32_t MergeBlock = *Ptr++;
 				uint32_t SelectionControl = /*SpvSelectionControlMask*/*Ptr++;
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpConvertFToS:
 			{
+				Verify(false);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
 				uint32_t Result = *Ptr++;
 				uint32_t FloatValue = *Ptr++;
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpFOrdEqual:
 			case SpvOpFOrdNotEqual:
 			case SpvOpFOrdLessThanEqual:
@@ -581,6 +665,7 @@ struct FSpirVParser
 			case SpvOpFOrdGreaterThan:
 			case SpvOpFOrdGreaterThanEqual:
 			{
+				Verify(false);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
 				uint32_t Result = *Ptr++;
@@ -588,26 +673,28 @@ struct FSpirVParser
 				uint32_t Operand2 = *Ptr++;
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpFNegate:
 			{
+				Verify(false);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
 				uint32_t Result = *Ptr++;
 				uint32_t Operand = *Ptr++;
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpAny:
 			case SpvOpAll:
 			{
+				Verify(false);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
 				uint32_t Result = *Ptr++;
 				uint32_t Vector = *Ptr++;
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpFAdd:
 			case SpvOpFDiv:
 			case SpvOpFSub:
@@ -616,6 +703,7 @@ struct FSpirVParser
 			case SpvOpDot:
 			case SpvOpOuterProduct:
 			{
+				Verify(false);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
 				uint32_t Result = *Ptr++;
@@ -623,18 +711,20 @@ struct FSpirVParser
 				uint32_t Operand2 = *Ptr++;
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpImage:
 			{
+				Verify(false);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
 				uint32_t Result = *Ptr++;
 				uint32_t SampledImage = *Ptr++;
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpImageSampleImplicitLod:
 			{
+				Verify(false);
 				FScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
@@ -648,9 +738,10 @@ struct FSpirVParser
 				}
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpBranchConditional:
 			{
+				Verify(false);
 				FScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t Condition = *Ptr++;
@@ -663,9 +754,10 @@ struct FSpirVParser
 				}
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpVectorShuffle:
 			{
+				Verify(false);
 				FScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
@@ -679,9 +771,10 @@ struct FSpirVParser
 				}
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpImageFetch:
 			{
+				Verify(false);
 				FScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
@@ -695,9 +788,10 @@ struct FSpirVParser
 				}
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			case SpvOpCompositeExtract:
 			{
+				Verify(false);
 				FScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
@@ -710,7 +804,7 @@ struct FSpirVParser
 				}
 				bAutoIncrease = false;
 			}
-			break;
+				break;
 			default:
 				Verify(false);
 			}
