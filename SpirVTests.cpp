@@ -128,6 +128,21 @@ struct FConstantComposite
 	std::vector<uint32_t> Constituents;
 };
 
+struct FLoad
+{
+	uint32_t ResultType;
+	uint32_t Pointer;
+	bool bHasMemoryAccess;
+	uint32_t MemoryAccess;
+};
+
+struct FAccessChain
+{
+	uint32_t Type;
+	uint32_t Base;
+	std::vector<uint32_t> Indices;
+};
+
 struct FVariable
 {
 	uint32_t Type;
@@ -136,11 +151,19 @@ struct FVariable
 	uint32_t Initializer;
 };
 
+struct FBlock
+{
+	uint32_t Label;
+	std::vector<uint32_t> Instructions;
+};
+
 struct FFunction
 {
 	uint32_t ResultType;
 	uint32_t FunctionControl = 0;
 	uint32_t FunctionType;
+
+	std::vector<FBlock> Blocks;
 };
 
 struct FType
@@ -250,6 +273,30 @@ struct FSpirVParser
 
 	std::map<uint32_t, FVariable> Variables;
 	std::map<uint32_t, FFunction> Functions;
+	std::map<uint32_t, FAccessChain> AccessChains;
+	std::map<uint32_t, FLoad> Loads;
+
+	uint32_t CurrentFunction = 0;
+
+	std::vector<uint32_t> Instructions;
+
+	std::vector<uint32_t>& GetInstructions()
+	{
+		if (CurrentFunction == 0)
+		{
+			return Instructions;
+		}
+		else
+		{
+			return GetFunction().Blocks.back().Instructions;
+		}
+	}
+
+	FFunction& GetFunction()
+	{
+		Verify(CurrentFunction != -1);
+		return Functions[CurrentFunction];
+	}
 
 	bool Init(const char* File)
 	{
@@ -502,6 +549,7 @@ struct FSpirVParser
 					Variable.Initializer = Initializer;
 				}
 				Variables[Result] = Variable;
+				GetInstructions().push_back(Result);
 				bAutoIncrease = false;
 			}
 				break;
@@ -582,6 +630,8 @@ struct FSpirVParser
 				Function.FunctionControl = /*SpvFunctionControlMask*/*Ptr++;
 				Function.FunctionType = *Ptr++;
 				Functions[Result] = Function;
+				Verify(CurrentFunction == 0);
+				CurrentFunction = Result;
 				bAutoIncrease = false;
 			}
 				break;
@@ -600,9 +650,12 @@ struct FSpirVParser
 				break;
 			case SpvOpLabel:
 			{
-				Verify(false);
+				auto& Function = GetFunction();
 				*Ptr++;
 				uint32_t Result = *Ptr++;
+				FBlock Block;
+				Block.Label = Result;
+				Function.Blocks.push_back(Block);
 				bAutoIncrease = false;
 			}
 				break;
@@ -616,34 +669,41 @@ struct FSpirVParser
 				break;
 			case SpvOpAccessChain:
 			{
-				Verify(false);
+				FAccessChain AccessChain;
 				FScope Scope(Ptr, WordCount);
 				*Ptr++;
-				uint32_t ResultType = *Ptr++;
+				AccessChain.Type = *Ptr++;
 				uint32_t Result = *Ptr++;
-				uint32_t Base = *Ptr++;
+				AccessChain.Base = *Ptr++;
 				int32_t NumIndices = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 				for (int32_t Index = 0; Index < NumIndices; ++Index)
 				{
 					uint32_t ChainIndex = *Ptr++;
+					AccessChain.Indices.push_back(ChainIndex);
 				}
+				AccessChains[Result] = AccessChain;
+				GetInstructions().push_back(Result);
 				bAutoIncrease = false;
 			}
 				break;
 			case SpvOpLoad:
 			{
-				Verify(false);
+				FLoad Load;
 				FScope Scope(Ptr, WordCount);
 				*Ptr++;
-				uint32_t ResultType = *Ptr++;
+				Load.ResultType = *Ptr++;
 				uint32_t Result = *Ptr++;
-				uint32_t Pointer = *Ptr++;
+				Load.Pointer = *Ptr++;
 				int32_t HasMemoryAccess = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 				Verify(HasMemoryAccess == 0 || HasMemoryAccess == 1);
+				Load.bHasMemoryAccess = HasMemoryAccess != 0;
 				if (HasMemoryAccess == 1)
 				{
 					uint32_t MemoryAccess = /*SpvMemoryAccessMask*/*Ptr++;
+					Load.MemoryAccess = MemoryAccess;
 				}
+				Loads[Result] = Load;
+				GetInstructions().push_back(Result);
 				bAutoIncrease = false;
 			}
 				break;
