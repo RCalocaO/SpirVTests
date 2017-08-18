@@ -116,6 +116,33 @@ struct FEntryPoint
 	std::vector<uint32_t> Interfaces;
 };
 
+struct FConstant
+{
+	uint32_t Type;
+	std::vector<uint32_t> Values;
+};
+
+struct FConstantComposite
+{
+	uint32_t Type;
+	std::vector<uint32_t> Constituents;
+};
+
+struct FVariable
+{
+	uint32_t Type;
+	SpvStorageClass StorageClass = SpvStorageClassMax;
+	bool bInitializer = false;
+	uint32_t Initializer;
+};
+
+struct FFunction
+{
+	uint32_t ResultType;
+	uint32_t FunctionControl = 0;
+	uint32_t FunctionType;
+};
+
 struct FType
 {
 	enum class EType
@@ -130,6 +157,7 @@ struct FType
 		Struct,
 		Pointer,
 		Image,
+		SampledImage,
 		Function,
 	};
 	EType Type = EType::Unknown;
@@ -162,7 +190,7 @@ struct FType
 
 	struct
 	{
-		SpvStorageClass StorageClass;
+		SpvStorageClass StorageClass = SpvStorageClassMax;
 		uint32_t Type;
 	} Pointer;
 
@@ -177,6 +205,8 @@ struct FType
 		SpvImageFormat ImageFormat = SpvImageFormatUnknown;
 		SpvAccessQualifier Qualifier = SpvAccessQualifierMax;
 	} Image;
+
+	uint32_t ImageType;
 };
 
 struct FSpirVParser
@@ -214,6 +244,12 @@ struct FSpirVParser
 	std::map<uint32_t, std::vector<FDecoration>> MemberDecorations;
 
 	std::map<uint32_t, FType> Types;
+
+	std::map<uint32_t, FConstant> Constants;
+	std::map<uint32_t, FConstantComposite> ConstantComposites;
+
+	std::map<uint32_t, FVariable> Variables;
+	std::map<uint32_t, FFunction> Functions;
 
 	bool Init(const char* File)
 	{
@@ -417,16 +453,18 @@ struct FSpirVParser
 				break;
 			case SpvOpConstant:
 			{
-				Verify(false);
+				FConstant Constant;
 				FScope Scope(Ptr, WordCount);
 				*Ptr++;
-				uint32_t ResultType = *Ptr++;
+				Constant.Type = *Ptr++;
 				uint32_t Result = *Ptr++;
 				int32_t NumValues = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 				for (int32_t Index = 0; Index < NumValues; ++Index)
 				{
 					uint32_t Value = *Ptr++;
+					Constant.Values.push_back(Value);
 				}
+				Constants[Result] = Constant;
 				bAutoIncrease = false;
 			}
 				break;
@@ -449,18 +487,21 @@ struct FSpirVParser
 				break;
 			case SpvOpVariable:
 			{
-				Verify(false);
+				FVariable Variable;
 				FScope Scope(Ptr, WordCount);
 				*Ptr++;
-				uint32_t ResultType = *Ptr++;
+				Variable.Type = *Ptr++;
 				uint32_t Result = *Ptr++;
-				SpvStorageClass StorageClass = (SpvStorageClass)*Ptr++;
+				Variable.StorageClass = (SpvStorageClass)*Ptr++;
 				int32_t HasInitializer = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 				Verify(HasInitializer == 0 || HasInitializer == 1);
+				Variable.bInitializer = true;
 				if (HasInitializer == 1)
 				{
 					uint32_t Initializer = *Ptr++;
+					Variable.Initializer = Initializer;
 				}
+				Variables[Result] = Variable;
 				bAutoIncrease = false;
 			}
 				break;
@@ -491,16 +532,18 @@ struct FSpirVParser
 				break;
 			case SpvOpConstantComposite:
 			{
-				Verify(false);
+				FConstantComposite Constant;
 				FScope Scope(Ptr, WordCount);
 				*Ptr++;
-				uint32_t ResultType = *Ptr++;
+				Constant.Type = *Ptr++;
 				uint32_t Result = *Ptr++;
 				int32_t NumElements = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 				for (int32_t Index = 0; Index < NumElements; ++Index)
 				{
 					uint32_t Element = *Ptr++;
+					Constant.Constituents.push_back(Element);
 				}
+				ConstantComposites[Result] = Constant;
 				bAutoIncrease = false;
 			}
 			break;
@@ -521,21 +564,24 @@ struct FSpirVParser
 				break;
 			case SpvOpTypeSampledImage:
 			{
-				Verify(false);
+				FType Type;
+				Type.Type = FType::EType::SampledImage;
 				*Ptr++;
 				uint32_t Result = *Ptr++;
-				uint32_t ImageType = *Ptr++;
+				Type.ImageType = *Ptr++;
+				Types[Result] = Type;
 				bAutoIncrease = false;
 			}
 				break;
 			case SpvOpFunction:
 			{
-				Verify(false);
+				FFunction Function;
 				*Ptr++;
-				uint32_t ResultType = *Ptr++;
+				Function.ResultType = *Ptr++;
 				uint32_t Result = *Ptr++;
-				uint32_t FunctionControl = /*SpvFunctionControlMask*/*Ptr++;
-				uint32_t FunctionType = *Ptr++;
+				Function.FunctionControl = /*SpvFunctionControlMask*/*Ptr++;
+				Function.FunctionType = *Ptr++;
+				Functions[Result] = Function;
 				bAutoIncrease = false;
 			}
 				break;
