@@ -116,6 +116,109 @@ struct FEntryPoint
 	std::vector<uint32_t> Interfaces;
 };
 
+struct FInstruction
+{
+	FInstruction(SpvOp InOpCode)
+		: OpCode(InOpCode)
+	{
+	}
+
+	SpvOp OpCode;
+	uint32_t Result = 0;
+
+	struct FVectorShuffle
+	{
+		uint32_t ResultType;
+		uint32_t Vector1;
+		uint32_t Vector2;
+		std::vector<uint32_t> Components;
+	} VectorShuffle;
+
+	struct FImage
+	{
+		uint32_t ResultType;
+		uint32_t SampledImage;
+	} Image;
+
+	struct FImageFetch
+	{
+		uint32_t ResultType;
+		uint32_t Image;
+		uint32_t Coordinate;
+		std::vector<SpvImageOperandsMask> ImageOperands;
+	} ImageFetch;
+
+	struct FImageSampleImplicitLod
+	{
+		uint32_t ResultType;
+		uint32_t SampledImage;
+		uint32_t Coordinate;
+		std::vector<SpvImageOperandsMask> Operands;
+	} ImageSampleImplicitLod;
+
+	struct FCompositeExtract
+	{
+		uint32_t ResultType;
+		uint32_t Composite;
+		std::vector<int32_t> Literals;
+	} CompositeExtract;
+
+	struct  FCompositeConstruct
+	{
+		uint32_t ResultType;
+		std::vector<uint32_t> Elements;
+	} CompositeConstruct;
+	struct FVariable
+	{
+		uint32_t Type;
+		SpvStorageClass StorageClass = SpvStorageClassMax;
+		bool bInitializer = false;
+		uint32_t Initializer;
+	} Var;
+
+	struct FAccessChain
+	{
+		uint32_t Type;
+		uint32_t Base;
+		std::vector<uint32_t> Indices;
+	} AccessChain;
+
+	struct FLoad
+	{
+		uint32_t ResultType;
+		uint32_t Pointer;
+		bool bHasMemoryAccess;
+		uint32_t MemoryAccess;
+	} Load;
+
+	struct FStore
+	{
+		uint32_t Pointer;
+		uint32_t Object;
+		bool bHasMemoryAccess = false;
+		SpvMemoryAccessMask MemoryAccess = (SpvMemoryAccessMask)0;
+	} Store;
+
+	struct FExpression
+	{
+		uint32_t ResultType;
+		uint32_t Op1;
+		uint32_t Op2 = 0;
+	} Expr;
+
+	struct FBranch
+	{
+		uint32_t Target;
+	} Branch;
+
+	struct FBranchConditional
+	{
+		uint32_t Condition;
+		uint32_t True;
+		uint32_t False;
+	} BranchConditional;
+};
+
 struct FConstant
 {
 	uint32_t Type;
@@ -128,33 +231,10 @@ struct FConstantComposite
 	std::vector<uint32_t> Constituents;
 };
 
-struct FLoad
-{
-	uint32_t ResultType;
-	uint32_t Pointer;
-	bool bHasMemoryAccess;
-	uint32_t MemoryAccess;
-};
-
-struct FAccessChain
-{
-	uint32_t Type;
-	uint32_t Base;
-	std::vector<uint32_t> Indices;
-};
-
-struct FVariable
-{
-	uint32_t Type;
-	SpvStorageClass StorageClass = SpvStorageClassMax;
-	bool bInitializer = false;
-	uint32_t Initializer;
-};
-
 struct FBlock
 {
 	uint32_t Label;
-	std::vector<uint32_t> Instructions;
+	std::vector<FInstruction> Instructions;
 };
 
 struct FFunction
@@ -271,16 +351,13 @@ struct FSpirVParser
 	std::map<uint32_t, FConstant> Constants;
 	std::map<uint32_t, FConstantComposite> ConstantComposites;
 
-	std::map<uint32_t, FVariable> Variables;
 	std::map<uint32_t, FFunction> Functions;
-	std::map<uint32_t, FAccessChain> AccessChains;
-	std::map<uint32_t, FLoad> Loads;
 
 	uint32_t CurrentFunction = 0;
 
-	std::vector<uint32_t> Instructions;
+	std::vector<FInstruction> Instructions;
 
-	std::vector<uint32_t>& GetInstructions()
+	std::vector<FInstruction>& GetInstructions()
 	{
 		if (CurrentFunction == 0)
 		{
@@ -534,22 +611,21 @@ struct FSpirVParser
 				break;
 			case SpvOpVariable:
 			{
-				FVariable Variable;
 				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
-				Variable.Type = *Ptr++;
-				uint32_t Result = *Ptr++;
-				Variable.StorageClass = (SpvStorageClass)*Ptr++;
+				FInstruction Instruction(OpCode);
+				Instruction.Var.Type = *Ptr++;
+				Instruction.Result = *Ptr++;
+				Instruction.Var.StorageClass = (SpvStorageClass)*Ptr++;
 				int32_t HasInitializer = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 				Verify(HasInitializer == 0 || HasInitializer == 1);
-				Variable.bInitializer = true;
+				Instruction.Var.bInitializer = true;
 				if (HasInitializer == 1)
 				{
 					uint32_t Initializer = *Ptr++;
-					Variable.Initializer = Initializer;
+					Instruction.Var.Initializer = Initializer;
 				}
-				Variables[Result] = Variable;
-				GetInstructions().push_back(Result);
+				GetInstructions().push_back(Instruction);
 				bAutoIncrease = false;
 			}
 				break;
@@ -597,16 +673,18 @@ struct FSpirVParser
 			break;
 			case SpvOpCompositeConstruct:
 			{
-				Verify(false);
+				FInstruction Instruction(OpCode);
 				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
-				uint32_t ResultType = *Ptr++;
-				uint32_t Result = *Ptr++;
+				Instruction.CompositeConstruct.ResultType = *Ptr++;
+				Instruction.Result = *Ptr++;
 				int32_t NumElements = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 				for (int32_t Index = 0; Index < NumElements; ++Index)
 				{
 					uint32_t Element = *Ptr++;
+					Instruction.CompositeConstruct.Elements.push_back(Element);
 				}
+				GetInstructions().push_back(Instruction);
 				bAutoIncrease = false;
 			}
 				break;
@@ -638,6 +716,7 @@ struct FSpirVParser
 			case SpvOpFunctionEnd:
 				break;
 			case SpvOpReturn:
+				break;
 			case SpvOpKill:
 				break;
 			case SpvOpReturnValue:
@@ -661,65 +740,66 @@ struct FSpirVParser
 				break;
 			case SpvOpBranch:
 			{
-				Verify(false);
+				FInstruction Instruction(OpCode);
 				*Ptr++;
-				uint32_t Result = *Ptr++;
+				Instruction.Branch.Target = *Ptr++;
+				GetInstructions().push_back(Instruction);
 				bAutoIncrease = false;
 			}
 				break;
 			case SpvOpAccessChain:
 			{
-				FAccessChain AccessChain;
+				FInstruction Instruction(OpCode);
 				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
-				AccessChain.Type = *Ptr++;
-				uint32_t Result = *Ptr++;
-				AccessChain.Base = *Ptr++;
+				Instruction.AccessChain.Type = *Ptr++;
+				Instruction.Result = *Ptr++;
+				Instruction.AccessChain.Base = *Ptr++;
 				int32_t NumIndices = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 				for (int32_t Index = 0; Index < NumIndices; ++Index)
 				{
 					uint32_t ChainIndex = *Ptr++;
-					AccessChain.Indices.push_back(ChainIndex);
+					Instruction.AccessChain.Indices.push_back(ChainIndex);
 				}
-				AccessChains[Result] = AccessChain;
-				GetInstructions().push_back(Result);
+				GetInstructions().push_back(Instruction);
 				bAutoIncrease = false;
 			}
 				break;
 			case SpvOpLoad:
 			{
-				FLoad Load;
+				FInstruction Instruction(OpCode);
 				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
-				Load.ResultType = *Ptr++;
-				uint32_t Result = *Ptr++;
-				Load.Pointer = *Ptr++;
+				Instruction.Load.ResultType = *Ptr++;
+				Instruction.Result = *Ptr++;
+				Instruction.Load.Pointer = *Ptr++;
 				int32_t HasMemoryAccess = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 				Verify(HasMemoryAccess == 0 || HasMemoryAccess == 1);
-				Load.bHasMemoryAccess = HasMemoryAccess != 0;
+				Instruction.Load.bHasMemoryAccess = HasMemoryAccess != 0;
 				if (HasMemoryAccess == 1)
 				{
 					uint32_t MemoryAccess = /*SpvMemoryAccessMask*/*Ptr++;
-					Load.MemoryAccess = MemoryAccess;
+					Instruction.Load.MemoryAccess = MemoryAccess;
 				}
-				Loads[Result] = Load;
-				GetInstructions().push_back(Result);
+				GetInstructions().push_back(Instruction);
 				bAutoIncrease = false;
 			}
 				break;
 			case SpvOpStore:
 			{
-				Verify(false);
+				FInstruction Instruction(OpCode);
 				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
-				uint32_t Pointer = *Ptr++;
-				uint32_t Object = *Ptr++;
-				int32_t HasMemoryAccess = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
+				Instruction.Store.Pointer = *Ptr++;
+				Instruction.Store.Object = *Ptr++;
+				uint32_t HasMemoryAccess = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 				Verify(HasMemoryAccess == 0 || HasMemoryAccess == 1);
+				Instruction.Store.bHasMemoryAccess = HasMemoryAccess != 0;
 				if (HasMemoryAccess == 1)
 				{
-					uint32_t MemoryAccess = /*SpvMemoryAccessMask*/*Ptr++;
+					Instruction.Store.MemoryAccess = (SpvMemoryAccessMask)*Ptr++;
 				}
+				GetInstructions().push_back(Instruction);
 				bAutoIncrease = false;
 			}
 				break;
@@ -734,73 +814,31 @@ struct FSpirVParser
 				*/
 			}
 				break;
-			case SpvOpINotEqual:
-			{
-				Verify(false);
-				*Ptr++;
-				uint32_t ResultType = *Ptr++;
-				uint32_t Result = *Ptr++;
-				uint32_t Op1 = *Ptr++;
-				uint32_t Op2 = *Ptr++;
-				bAutoIncrease = false;
-			}
-				break;
 			case SpvOpSelectionMerge:
 			{
-				Verify(false);
+				// Target Block after selection block
 				*Ptr++;
 				uint32_t MergeBlock = *Ptr++;
-				uint32_t SelectionControl = /*SpvSelectionControlMask*/*Ptr++;
-				bAutoIncrease = false;
-			}
-				break;
-			case SpvOpConvertFToS:
-			{
-				Verify(false);
-				*Ptr++;
-				uint32_t ResultType = *Ptr++;
-				uint32_t Result = *Ptr++;
-				uint32_t FloatValue = *Ptr++;
-				bAutoIncrease = false;
-			}
-				break;
-			case SpvOpFOrdEqual:
-			case SpvOpFOrdNotEqual:
-			case SpvOpFOrdLessThanEqual:
-			case SpvOpFOrdLessThan:
-			case SpvOpFOrdGreaterThan:
-			case SpvOpFOrdGreaterThanEqual:
-			{
-				Verify(false);
-				*Ptr++;
-				uint32_t ResultType = *Ptr++;
-				uint32_t Result = *Ptr++;
-				uint32_t Operand1 = *Ptr++;
-				uint32_t Operand2 = *Ptr++;
+				SpvSelectionControlMask SelectionControl = (SpvSelectionControlMask)*Ptr++;
+				Verify(SelectionControl == 0);
 				bAutoIncrease = false;
 			}
 				break;
 			case SpvOpFNegate:
-			{
-				Verify(false);
-				*Ptr++;
-				uint32_t ResultType = *Ptr++;
-				uint32_t Result = *Ptr++;
-				uint32_t Operand = *Ptr++;
-				bAutoIncrease = false;
-			}
-				break;
+			case SpvOpConvertFToS:
 			case SpvOpAny:
 			case SpvOpAll:
 			{
-				Verify(false);
+				FInstruction Instruction(OpCode);
 				*Ptr++;
-				uint32_t ResultType = *Ptr++;
-				uint32_t Result = *Ptr++;
-				uint32_t Vector = *Ptr++;
+				Instruction.Expr.ResultType = *Ptr++;
+				Instruction.Result = *Ptr++;
+				Instruction.Expr.Op1 = *Ptr++;
+				GetInstructions().push_back(Instruction);
 				bAutoIncrease = false;
 			}
 				break;
+			case SpvOpINotEqual:
 			case SpvOpFAdd:
 			case SpvOpFDiv:
 			case SpvOpFSub:
@@ -808,106 +846,124 @@ struct FSpirVParser
 			case SpvOpFMod:
 			case SpvOpDot:
 			case SpvOpOuterProduct:
+			case SpvOpFOrdEqual:
+			case SpvOpFOrdNotEqual:
+			case SpvOpFOrdLessThanEqual:
+			case SpvOpFOrdLessThan:
+			case SpvOpFOrdGreaterThan:
+			case SpvOpFOrdGreaterThanEqual:
 			{
-				Verify(false);
+				FInstruction Instruction(OpCode);
 				*Ptr++;
-				uint32_t ResultType = *Ptr++;
-				uint32_t Result = *Ptr++;
-				uint32_t Operand1 = *Ptr++;
-				uint32_t Operand2 = *Ptr++;
+				Instruction.Expr.ResultType = *Ptr++;
+				Instruction.Result = *Ptr++;
+				Instruction.Expr.Op1 = *Ptr++;
+				Instruction.Expr.Op2 = *Ptr++;
+				GetInstructions().push_back(Instruction);
 				bAutoIncrease = false;
 			}
 				break;
 			case SpvOpImage:
 			{
-				Verify(false);
+				FInstruction Instruction(OpCode);
 				*Ptr++;
-				uint32_t ResultType = *Ptr++;
-				uint32_t Result = *Ptr++;
-				uint32_t SampledImage = *Ptr++;
+				Instruction.Image.ResultType = *Ptr++;
+				Instruction.Result = *Ptr++;
+				Instruction.Image.SampledImage = *Ptr++;
+				GetInstructions().push_back(Instruction);
 				bAutoIncrease = false;
 			}
 				break;
 			case SpvOpImageSampleImplicitLod:
 			{
-				Verify(false);
+				FInstruction Instruction(OpCode);
 				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
-				uint32_t ResultType = *Ptr++;
-				uint32_t Result = *Ptr++;
-				uint32_t SampledImage = *Ptr++;
-				uint32_t Coordinate = *Ptr++;
+				Instruction.ImageSampleImplicitLod.ResultType = *Ptr++;
+				Instruction.Result = *Ptr++;
+				Instruction.ImageSampleImplicitLod.SampledImage = *Ptr++;
+				Instruction.ImageSampleImplicitLod.Coordinate = *Ptr++;
 				int32_t NumOperands = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 				for (int32_t Index = 0; Index < NumOperands; ++Index)
 				{
-					uint32_t Operand = /*SpvImageOperandsMask*/*Ptr++;
+					SpvImageOperandsMask Operand = (SpvImageOperandsMask)*Ptr++;
+					Instruction.ImageSampleImplicitLod.Operands.push_back(Operand);
 				}
+				GetInstructions().push_back(Instruction);
 				bAutoIncrease = false;
 			}
 				break;
 			case SpvOpBranchConditional:
 			{
-				Verify(false);
+				FInstruction Instruction(OpCode);
 				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
-				uint32_t Condition = *Ptr++;
-				uint32_t TrueLabel = *Ptr++;
-				uint32_t FalseLabel = *Ptr++;
+				Instruction.BranchConditional.Condition = *Ptr++;
+				Instruction.BranchConditional.True = *Ptr++;
+				Instruction.BranchConditional.False = *Ptr++;
 				int32_t NumBranchWeights = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
+				Verify(NumBranchWeights == 0);
 				for (int32_t Index = 0; Index < NumBranchWeights; ++Index)
 				{
 					uint32_t BranchWeight = *Ptr++;
 				}
+				GetInstructions().push_back(Instruction);
 				bAutoIncrease = false;
 			}
 				break;
 			case SpvOpVectorShuffle:
 			{
-				Verify(false);
+				FInstruction Instruction(OpCode);
 				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
-				uint32_t ResultType = *Ptr++;
-				uint32_t Result = *Ptr++;
-				uint32_t Vector1 = *Ptr++;
-				uint32_t Vector2 = *Ptr++;
+				Instruction.VectorShuffle.ResultType = *Ptr++;
+				Instruction.Result = *Ptr++;
+				Instruction.VectorShuffle.Vector1 = *Ptr++;
+				Instruction.VectorShuffle.Vector2 = *Ptr++;
 				int32_t NumComponents = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 				for (int32_t Index = 0; Index < NumComponents; ++Index)
 				{
 					uint32_t Component = *Ptr++;
+					Instruction.VectorShuffle.Components.push_back(Component);
 				}
+				GetInstructions().push_back(Instruction);
 				bAutoIncrease = false;
 			}
 				break;
 			case SpvOpImageFetch:
 			{
-				Verify(false);
+				FInstruction Instruction(OpCode);
 				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
-				uint32_t ResultType = *Ptr++;
-				uint32_t Result = *Ptr++;
-				uint32_t Image = *Ptr++;
-				uint32_t Coordinate = *Ptr++;
+				Instruction.ImageFetch.ResultType = *Ptr++;
+				Instruction.Result = *Ptr++;
+				Instruction.ImageFetch.Image = *Ptr++;
+				Instruction.ImageFetch.Coordinate = *Ptr++;
 				int32_t NumComponents = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 				for (int32_t Index = 0; Index < NumComponents; ++Index)
 				{
-					uint32_t ImageOperands = /*SpvImageOperandsMask*/*Ptr++;
+					SpvImageOperandsMask ImageOperands = (SpvImageOperandsMask)*Ptr++;
+					Instruction.ImageFetch.ImageOperands.push_back(ImageOperands);
 				}
+				GetInstructions().push_back(Instruction);
 				bAutoIncrease = false;
 			}
 				break;
 			case SpvOpCompositeExtract:
 			{
-				Verify(false);
+				FInstruction Instruction(OpCode);
 				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
-				uint32_t ResultType = *Ptr++;
-				uint32_t Result = *Ptr++;
-				uint32_t Composite = *Ptr++;
+				Instruction.CompositeExtract.ResultType = *Ptr++;
+				Instruction.Result = *Ptr++;
+				Instruction.CompositeExtract.Composite = *Ptr++;
 				int32_t NumComponents = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
 				for (int32_t Index = 0; Index < NumComponents; ++Index)
 				{
 					int32_t Literal = *Ptr++;
+					Instruction.CompositeExtract.Literals.push_back(Literal);
 				}
+				GetInstructions().push_back(Instruction);
 				bAutoIncrease = false;
 			}
 				break;
