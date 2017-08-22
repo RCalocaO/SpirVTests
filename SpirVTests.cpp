@@ -63,20 +63,20 @@ std::string ReadLiteralString(uint32_t*& Ptr)
 	return S;
 }
 
-struct FScope
+struct FReaderScope
 {
 	uint32_t* SrcPtr;
 	uint32_t*& Ptr;
 	uint32_t WordCount;
 
-	FScope(uint32_t*& OriginalPtr, uint32_t InWordCount)
+	FReaderScope(uint32_t*& OriginalPtr, uint32_t InWordCount)
 		: SrcPtr(OriginalPtr)
 		, Ptr(OriginalPtr)
 		, WordCount(InWordCount)
 	{
 	}
 
-	~FScope()
+	~FReaderScope()
 	{
 		Verify(SrcPtr + WordCount == Ptr);
 	}
@@ -332,7 +332,7 @@ struct FSpirVParser
 				break;
 			case SpvOpEntryPoint:
 			{
-				FScope Scope(Ptr, WordCount);
+				FReaderScope Scope(Ptr, WordCount);
 				Ptr++;
 				SpvExecutionModel ExecModel = (SpvExecutionModel)*Ptr++;
 				ProcessExecModel(ExecModel);
@@ -355,7 +355,7 @@ struct FSpirVParser
 				break;
 			case SpvOpName:
 			{
-				FScope Scope(Ptr, WordCount);
+				FReaderScope Scope(Ptr, WordCount);
 				Ptr++;
 				uint32_t Target = *Ptr++;
 				auto Name = ReadLiteralString(Ptr);
@@ -365,7 +365,7 @@ struct FSpirVParser
 				break;
 			case SpvOpMemberName:
 			{
-				FScope Scope(Ptr, WordCount);
+				FReaderScope Scope(Ptr, WordCount);
 				Ptr++;
 				uint32_t StructType = *Ptr++;
 				FMemberName MemberName;
@@ -377,7 +377,7 @@ struct FSpirVParser
 				break;
 			case SpvOpDecorate:
 			{
-				FScope Scope(Ptr, WordCount);
+				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t Target = *Ptr++;
 				FDecoration Decoration;
@@ -390,7 +390,7 @@ struct FSpirVParser
 				break;
 			case SpvOpMemberDecorate:
 			{
-				FScope Scope(Ptr, WordCount);
+				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t StructureType = *Ptr++;
 				FMemberDecoration Decoration;
@@ -415,7 +415,7 @@ struct FSpirVParser
 			{
 				FType Type;
 				Type.Type = FType::EType::Function;
-				FScope Scope(Ptr, WordCount);
+				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t Result = *Ptr++;
 				Type.Function.ReturnType = *Ptr++;
@@ -501,7 +501,7 @@ struct FSpirVParser
 			case SpvOpConstant:
 			{
 				FConstant Constant;
-				FScope Scope(Ptr, WordCount);
+				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
 				Constant.Type = *Ptr++;
 				uint32_t Result = *Ptr++;
@@ -519,7 +519,7 @@ struct FSpirVParser
 			{
 				FType Type;
 				Type.Type = FType::EType::Struct;
-				FScope Scope(Ptr, WordCount);
+				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
 				int32_t NumMembers = (int32_t)((Scope.SrcPtr + WordCount) - Ptr);
@@ -535,7 +535,7 @@ struct FSpirVParser
 			case SpvOpVariable:
 			{
 				FVariable Variable;
-				FScope Scope(Ptr, WordCount);
+				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
 				Variable.Type = *Ptr++;
 				uint32_t Result = *Ptr++;
@@ -557,7 +557,7 @@ struct FSpirVParser
 			{
 				FType Type;
 				Type.Type = FType::EType::Image;
-				FScope Scope(Ptr, WordCount);
+				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
 				Type.Image.SampledType = *Ptr++;
@@ -581,7 +581,7 @@ struct FSpirVParser
 			case SpvOpConstantComposite:
 			{
 				FConstantComposite Constant;
-				FScope Scope(Ptr, WordCount);
+				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
 				Constant.Type = *Ptr++;
 				uint32_t Result = *Ptr++;
@@ -598,7 +598,7 @@ struct FSpirVParser
 			case SpvOpCompositeConstruct:
 			{
 				Verify(false);
-				FScope Scope(Ptr, WordCount);
+				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
 				uint32_t Result = *Ptr++;
@@ -670,7 +670,7 @@ struct FSpirVParser
 			case SpvOpAccessChain:
 			{
 				FAccessChain AccessChain;
-				FScope Scope(Ptr, WordCount);
+				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
 				AccessChain.Type = *Ptr++;
 				uint32_t Result = *Ptr++;
@@ -689,7 +689,7 @@ struct FSpirVParser
 			case SpvOpLoad:
 			{
 				FLoad Load;
-				FScope Scope(Ptr, WordCount);
+				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
 				Load.ResultType = *Ptr++;
 				uint32_t Result = *Ptr++;
@@ -710,7 +710,7 @@ struct FSpirVParser
 			case SpvOpStore:
 			{
 				Verify(false);
-				FScope Scope(Ptr, WordCount);
+				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t Pointer = *Ptr++;
 				uint32_t Object = *Ptr++;
@@ -831,7 +831,7 @@ struct FSpirVParser
 			case SpvOpImageSampleImplicitLod:
 			{
 				Verify(false);
-				FScope Scope(Ptr, WordCount);
+				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
 				uint32_t Result = *Ptr++;
@@ -848,7 +848,7 @@ struct FSpirVParser
 			case SpvOpBranchConditional:
 			{
 				Verify(false);
-				FScope Scope(Ptr, WordCount);
+				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t Condition = *Ptr++;
 				uint32_t TrueLabel = *Ptr++;
@@ -864,7 +864,7 @@ struct FSpirVParser
 			case SpvOpVectorShuffle:
 			{
 				Verify(false);
-				FScope Scope(Ptr, WordCount);
+				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
 				uint32_t Result = *Ptr++;
@@ -881,7 +881,7 @@ struct FSpirVParser
 			case SpvOpImageFetch:
 			{
 				Verify(false);
-				FScope Scope(Ptr, WordCount);
+				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
 				uint32_t Result = *Ptr++;
@@ -898,7 +898,7 @@ struct FSpirVParser
 			case SpvOpCompositeExtract:
 			{
 				Verify(false);
-				FScope Scope(Ptr, WordCount);
+				FReaderScope Scope(Ptr, WordCount);
 				*Ptr++;
 				uint32_t ResultType = *Ptr++;
 				uint32_t Result = *Ptr++;
