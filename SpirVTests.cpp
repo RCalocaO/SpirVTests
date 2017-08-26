@@ -123,125 +123,125 @@ struct FInstruction
 	{
 	}
 
-	SpvOp OpCode;
+	SpvOp OpCode = SpvOpNop;
 	uint32_t Result = 0;
 
 	struct FVectorShuffle
 	{
-		uint32_t ResultType;
-		uint32_t Vector1;
-		uint32_t Vector2;
+		uint32_t ResultType = 0;
+		uint32_t Vector1 = 0;
+		uint32_t Vector2 = 0;
 		std::vector<uint32_t> Components;
 	} VectorShuffle;
 
 	struct FImage
 	{
-		uint32_t ResultType;
-		uint32_t SampledImage;
+		uint32_t ResultType = 0;
+		uint32_t SampledImage = 0;
 	} Image;
 
 	struct FImageFetch
 	{
-		uint32_t ResultType;
-		uint32_t Image;
-		uint32_t Coordinate;
+		uint32_t ResultType = 0;
+		uint32_t Image = 0;
+		uint32_t Coordinate = 0;
 		std::vector<SpvImageOperandsMask> ImageOperands;
 	} ImageFetch;
 
 	struct FImageSampleImplicitLod
 	{
-		uint32_t ResultType;
-		uint32_t SampledImage;
-		uint32_t Coordinate;
+		uint32_t ResultType = 0;
+		uint32_t SampledImage = 0;
+		uint32_t Coordinate = 0;
 		std::vector<SpvImageOperandsMask> Operands;
 	} ImageSampleImplicitLod;
 
 	struct FCompositeExtract
 	{
-		uint32_t ResultType;
-		uint32_t Composite;
+		uint32_t ResultType = 0;
+		uint32_t Composite = 0;
 		std::vector<int32_t> Literals;
 	} CompositeExtract;
 
 	struct  FCompositeConstruct
 	{
-		uint32_t ResultType;
+		uint32_t ResultType = 0;
 		std::vector<uint32_t> Elements;
 	} CompositeConstruct;
 	struct FVariable
 	{
-		uint32_t Type;
+		uint32_t Type = 0;
 		SpvStorageClass StorageClass = SpvStorageClassMax;
 		bool bInitializer = false;
-		uint32_t Initializer;
+		uint32_t Initializer = 0;
 	} Var;
 
 	struct FAccessChain
 	{
-		uint32_t Type;
-		uint32_t Base;
+		uint32_t Type = 0;
+		uint32_t Base = 0;
 		std::vector<uint32_t> Indices;
 	} AccessChain;
 
 	struct FLoad
 	{
-		uint32_t ResultType;
-		uint32_t Pointer;
-		bool bHasMemoryAccess;
-		uint32_t MemoryAccess;
+		uint32_t ResultType = 0;
+		uint32_t Pointer = 0;
+		bool bHasMemoryAccess = false;
+		uint32_t MemoryAccess = 0;
 	} Load;
 
 	struct FStore
 	{
-		uint32_t Pointer;
-		uint32_t Object;
+		uint32_t Pointer = 0;
+		uint32_t Object = 0;
 		bool bHasMemoryAccess = false;
 		SpvMemoryAccessMask MemoryAccess = (SpvMemoryAccessMask)0;
 	} Store;
 
 	struct FExpression
 	{
-		uint32_t ResultType;
-		uint32_t Op1;
+		uint32_t ResultType = 0;
+		uint32_t Op1 = 0;
 		uint32_t Op2 = 0;
 	} Expr;
 
 	struct FBranch
 	{
-		uint32_t Target;
+		uint32_t Target = 0;
 	} Branch;
 
 	struct FBranchConditional
 	{
-		uint32_t Condition;
-		uint32_t True;
-		uint32_t False;
+		uint32_t Condition = 0;
+		uint32_t True = 0;
+		uint32_t False = 0;
 	} BranchConditional;
 };
 
 struct FConstant
 {
-	uint32_t Type;
+	uint32_t Type = 0;
 	std::vector<uint32_t> Values;
 };
 
 struct FConstantComposite
 {
-	uint32_t Type;
+	uint32_t Type = 0;
 	std::vector<uint32_t> Constituents;
 };
 
 struct FBlock
 {
-	uint32_t Label;
+	uint32_t Label = 0;
 	std::vector<FInstruction> Instructions;
 };
 
 struct FFunction
 {
-	uint32_t ResultType;
+	uint32_t ResultType = 0;
 	uint32_t FunctionControl = 0;
-	uint32_t FunctionType;
+	uint32_t FunctionType = 0;
 
 	std::vector<FBlock> Blocks;
 };
@@ -714,6 +714,7 @@ struct FSpirVParser
 			}
 				break;
 			case SpvOpFunctionEnd:
+				CurrentFunction = 0;
 				break;
 			case SpvOpReturn:
 				break;
