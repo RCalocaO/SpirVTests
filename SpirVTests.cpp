@@ -986,16 +986,31 @@ struct FSpirVParser
 	}
 };
 
-int main()
+int main(int argc, char** argv)
 {
-	FSpirVParser Parser;
-	if (!Parser.Init(SPVFile))
+	if (argc > 1)
 	{
-		return 1;
-	}
+		for (int i = 1; i < argc; ++i)
+		{
+			FSpirVParser Parser;
+			if (!Parser.Init(argv[i]))
+			{
+				return 1;
+			}
 
-	Parser.Process();
+			Parser.Process();
+		}
+	}
+	else
+	{
+		FSpirVParser Parser;
+		if (!Parser.Init(SPVFile))
+		{
+			return 1;
+		}
+
+		Parser.Process();
+	}
 
 	return 0;
 }
-
